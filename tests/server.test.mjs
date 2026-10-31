@@ -21,6 +21,13 @@ test('live workspace starts empty and coordinator routes require a session',asyn
   const config=await (await a.fetch('/api/config',{headers:{Cookie:cookie}})).json();assert.equal(JSON.stringify(config).includes('test-admin'),false);
   const cross=await a.fetch('/api/action',{method:'POST',headers:{Cookie:cookie,Origin:'https://bad.example','Content-Type':'application/json'},body:'{}'});assert.equal(cross.status,403);
 });
+test('public landing and separate role routes do not expose the coordinator workspace',async t=>{
+ const a=await app(t);
+ const home=await a.fetch('/');assert.equal(home.status,200);const html=await home.text();assert.match(html,/A little help/);assert.match(html,/\/supplier\/sign-in/);assert.doesNotMatch(html,/src="\/app.js"/);
+ for(const path of ['/volunteer/sign-in','/volunteer/sign-up','/supplier/sign-in','/supplier/sign-up']){const r=await a.fetch(path);assert.equal(r.status,200);assert.match(await r.text(),/community.js/);}
+ const coordinator=await a.fetch('/coordinator/sign-in');assert.equal(coordinator.status,200);assert.match(await coordinator.text(),/app.js/);
+ assert.equal((await a.fetch('/api/state')).status,401);
+});
 test('tool authentication is independent of admin sessions; errors do not create records',async t=>{
   const a=await app(t); const body={name:'Resident',location:'School',category:'water',quantity:4,unit:'litres',people:2,priority:'normal',action_id:'live-action'};
   assert.equal((await a.fetch('/api/tools/create_request',{method:'POST',body:JSON.stringify(body)})).status,401);

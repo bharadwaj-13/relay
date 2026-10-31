@@ -23,6 +23,19 @@ test('public signup verifies phone and creates an isolated self-service voluntee
   assert.notEqual(f.members.me(other.token).account.id,own.account.id);
   f.members.logout(user.token);assert.throws(()=>f.members.me(user.token),/Sign in/);
 });
+test('separate portal sign-ins reject the wrong role and scope dual-role sessions',async t=>{
+ const f=fixture(t),volunteer=await f.join('volunteer','+15555550101'),supplier=await f.join('supplier','+15555550111'),both=await f.join('both','+15555550122');
+ assert.throws(()=>f.members.login({...volunteer,portal:'supplier'}),/sign-in/);
+ assert.throws(()=>f.members.login({...supplier,portal:'volunteer'}),/sign-in/);
+ const v=f.members.login({...both,portal:'volunteer'}).token;
+ assert.equal(f.members.me(v,'volunteer').portal,'volunteer');
+ assert.throws(()=>f.members.me(v,'supplier'),/supplier portal/);
+ assert.throws(()=>f.members.addSupply(v,{}),/supplier portal/);
+ const s=f.members.login({...both,portal:'supplier'}).token;
+ assert.equal(f.members.me(s,'supplier').volunteer,null);
+ assert.deepEqual(f.members.me(s,'supplier').offers,[]);
+ assert.throws(()=>f.members.enroll(s,{}),/volunteer portal/);
+});
 test('unverified accounts cannot sign in and incorrect codes are rate-limited',async t=>{
   const f=fixture(t),input={name:'Test',phone:'+971500000012',password:'test-password-long',role:'volunteer',consent:true};
   const signup=await f.members.signup(input);assert.throws(()=>f.members.login(input),/Verify/);

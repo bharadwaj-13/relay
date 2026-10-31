@@ -86,7 +86,7 @@ export function createApp(env = process.env, suppliedStore = null) {
           return json(200, { signedIn: true });
         }
         if (path === '/api/members/logout' && req.method === 'POST') { members.logout(memberToken); res.setHeader('Set-Cookie','relay_member=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0'); return json(200, { signedOut: true }); }
-        if (path === '/api/members/me' && req.method === 'GET') return json(200, members.me(memberToken));
+        if (path === '/api/members/me' && req.method === 'GET') return json(200, members.me(memberToken,url.searchParams.get('portal')||undefined));
         if (path === '/api/members/events' && req.method === 'GET') {
           members.account(memberToken);
           res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' }); res.write('event: connected\ndata: {}\n\n');
@@ -145,8 +145,7 @@ export function createApp(env = process.env, suppliedStore = null) {
         throw new AppError('Endpoint not found.', 404);
       }
       if (!['GET','HEAD'].includes(req.method)) throw new AppError('Method not allowed.', 405);
-      if (path === '/') { res.writeHead(302, { Location: '/coordinator/' }); res.end(); return; }
-      const aliases = { '/coordinator/': 'index.html', '/coordinator': 'index.html', '/coordinator/sign-in': 'index.html', '/volunteer/': 'join.html', '/volunteer': 'join.html', '/volunteer/sign-in': 'join.html', '/volunteer/sign-up': 'join.html' };
+      const aliases = { '/': 'index.html', '/coordinator/': 'coordinator.html', '/coordinator': 'coordinator.html', '/coordinator/sign-in': 'coordinator.html', '/volunteer/': 'join.html', '/volunteer': 'join.html', '/volunteer/sign-in': 'join.html', '/volunteer/sign-up': 'join.html', '/supplier/': 'join.html', '/supplier': 'join.html', '/supplier/sign-in': 'join.html', '/supplier/sign-up': 'join.html' };
       const filename = aliases[path] || decodeURIComponent(path).slice(1);
       const publicRoot = join(root, 'public');
       const file = resolve(publicRoot, filename);
