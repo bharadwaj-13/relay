@@ -41,7 +41,7 @@ function updateInbox(){
 }
 async function refresh() {
   me=await api('members/me');dashboard();
-  if(!memberEvents){memberEvents=new EventSource('/api/members/events');memberEvents.addEventListener('change',()=>{clearTimeout(updateTimer);updateTimer=setTimeout(async()=>{try{me=await api('members/me');updateInbox();}catch{}},150);});}
+  if(!memberEvents){const timer=setInterval(async()=>{if(document.hidden)return;try{me=await api('members/me');updateInbox();}catch{}},5000);memberEvents={close:()=>clearInterval(timer)};}
 }
 document.addEventListener('click',async e=>{
   const modeButton=e.target.closest('[data-mode]');if(modeButton){mode=modeButton.dataset.mode;history.replaceState(null,'',mode==='login'?'/volunteer/sign-in':'/volunteer/sign-up');landing();return;}

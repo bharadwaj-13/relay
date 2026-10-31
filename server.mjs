@@ -2,7 +2,7 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { resolve, join, extname } from 'node:path';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, createHash } from 'node:crypto';
 import { Store } from './lib/store.mjs';
 import { ReliefService, AppError } from './lib/domain.mjs';
 import { seed } from './lib/seed.mjs';
@@ -14,11 +14,11 @@ import { MemberService } from './lib/members.mjs';
 import { ResidentService } from './lib/residents.mjs';
 
 const root = fileURLToPath(new URL('.', import.meta.url));
-export function createApp(env = process.env) {
+export function createApp(env = process.env, suppliedStore = null) {
   const demo = env.DEMO_MODE !== 'false';
   const host = env.HOST || '127.0.0.1';
   if ((!demo || env.PUBLIC_BASE_URL || !['127.0.0.1','localhost','::1'].includes(host)) && (!env.ADMIN_PASSWORD || !env.TOOL_API_KEY || !env.WEBHOOK_SECRET)) throw new Error('Live, public-URL, or non-loopback hosting requires ADMIN_PASSWORD, TOOL_API_KEY, and WEBHOOK_SECRET.');
-  const store = new Store(env.DATABASE_PATH || join(root, 'data', demo ? 'relay-demo.sqlite' : 'relay-live.sqlite'));
+  const store = suppliedStore || new Store(env.DATABASE_PATH || join(root, 'data', demo ? 'relay-demo.sqlite' : 'relay-live.sqlite'));
   const service = new ReliefService(store);
   const workspaceMode = demo ? 'demo' : 'live';
   if (store.meta('workspace_mode') && store.meta('workspace_mode') !== workspaceMode) { store.close(); throw new Error('This database belongs to another mode. Set a different DATABASE_PATH; demo and live data must stay separate.'); }
@@ -29,10 +29,11 @@ export function createApp(env = process.env) {
   const residents = new ResidentService(service, env);
   const sessions = new Map(), rates = new Map();
   const coordinatorPassword = env.ADMIN_PASSWORD || 'relay-demo-coordinator';
+  const sessionId = token => createHash('sha256').update(token).digest('hex');
   const config = () => ({ demo, authRequired: true, agentConfigured: !!env.VAANI_AGENT_ID, apiConfigured: !!env.VAANI_API_KEY, toolsConfigured: !!env.TOOL_API_KEY, webhookConfigured: !!env.WEBHOOK_SECRET, agentId: env.VAANI_AGENT_ID || null, publicBaseUrl: env.PUBLIC_BASE_URL || '', platformUrl: 'https://platform.vaani.dev/', incident: { name: demo ? 'Bengaluru flood response' : 'Relief operations', subtitle: demo ? 'Exercise area · illustrative locations' : 'Live coordination workspace', status: demo ? 'Exercise mode' : 'Live workspace' } });
   const authenticated = req => {
     const token = /(?:^|;\s*)relay_session=([a-f0-9]+)/.exec(req.headers.cookie || '')?.[1];
-    if (token && sessions.get(token) > Date.now()) return true;
+    if (token && (env.SERVERLESS === 'true' ? store.get('coordinatorSessions',sessionId(token))?.expiresAt : sessions.get(token)) > Date.now()) return true;
     if (token) sessions.delete(token);
     return false;
   };
@@ -47,10 +48,11 @@ export function createApp(env = process.env) {
     try {
       if (path.startsWith('/api/')) {
         const authPath = path === '/api/login' || ['/api/members/signup','/api/members/login','/api/members/verify'].includes(path);
-        const key = `${req.socket.remoteAddress}:${authPath ? 'login' : 'api'}`;
-        const rate = rates.get(key) || { count: 0, until: Date.now() + 60000 };
+        const key = `${env.SERVERLESS === 'true' ? req.headers['x-real-ip'] || req.socket?.remoteAddress : req.socket.remoteAddress}:${authPath ? 'login' : 'api'}`;
+        const rate = (env.SERVERLESS === 'true' ? store.get('rateLimits',key) : rates.get(key)) || { count: 0, until: Date.now() + 60000 };
         if (rate.until < Date.now()) { rate.count = 0; rate.until = Date.now() + 60000; }
         rate.count++; rates.set(key, rate);
+        if(env.SERVERLESS === 'true')store.put('rateLimits',{id:key,...rate});
         if (rate.count > (authPath ? 12 : 600)) throw new AppError('Too many requests. Please retry shortly.', 429);
         let raw = Buffer.alloc(0), input = {};
         if (['POST','PATCH','PUT'].includes(req.method)) {
@@ -103,6 +105,7 @@ export function createApp(env = process.env) {
         if (path === '/api/login' && req.method === 'POST') {
           if (!equalSecret(input.password, coordinatorPassword)) throw new AppError('Incorrect password.', 401);
           const token = randomBytes(32).toString('hex'); sessions.set(token, Date.now() + 12 * 3600000);
+          if(env.SERVERLESS === 'true')store.put('coordinatorSessions',{id:sessionId(token),expiresAt:Date.now()+12*3600000});
           res.setHeader('Set-Cookie', `relay_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=43200${env.PUBLIC_BASE_URL?.startsWith('https:') ? '; Secure' : ''}`);
           return json(200, { ok: true });
         }
@@ -114,6 +117,7 @@ export function createApp(env = process.env) {
         if (path === '/api/dispatch/run' && req.method === 'POST') { dispatcher.tick(); return json(200, { ok: true }); }
         if (path === '/api/logout' && req.method === 'POST') {
           const token = /(?:^|;\s*)relay_session=([a-f0-9]+)/.exec(req.headers.cookie || '')?.[1]; sessions.delete(token);
+          if(env.SERVERLESS === 'true' && token)store.put('coordinatorSessions',{id:sessionId(token),expiresAt:0});
           res.setHeader('Set-Cookie', 'relay_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0'); return json(200, { ok: true });
         }
         if (path === '/api/config' && req.method === 'GET') return json(200, config());
@@ -153,8 +157,8 @@ export function createApp(env = process.env) {
       res.end(req.method === 'HEAD' ? undefined : content);
     } catch (error) { if (!res.headersSent) json(error.status || 500, { error: error.status ? error.message : 'Unexpected server error. No action is confirmed; refresh the workspace.' }); else res.end(); }
   });
-  const cleanup = setInterval(() => { for (const [k, v] of sessions) if (v < Date.now()) sessions.delete(k); for (const [k, v] of rates) if (v.until < Date.now()) rates.delete(k); }, 60000); cleanup.unref();
-  const dispatchWorker = setInterval(() => { try { dispatcher.tick(); dispatcher.flushNotifications().catch(()=>{}); } catch { /* retry evaluation on next tick, never repeat an uncertain SMS */ } }, 5000); dispatchWorker.unref();
+  const cleanup = env.SERVERLESS === 'true' ? null : setInterval(() => { for (const [k, v] of sessions) if (v < Date.now()) sessions.delete(k); for (const [k, v] of rates) if (v.until < Date.now()) rates.delete(k); }, 60000); cleanup?.unref();
+  const dispatchWorker = env.SERVERLESS === 'true' ? null : setInterval(() => { try { dispatcher.tick(); dispatcher.flushNotifications().catch(()=>{}); } catch { /* retry evaluation on next tick, never repeat an uncertain SMS */ } }, 5000); dispatchWorker?.unref();
   server.on('close', () => { clearInterval(cleanup); clearInterval(dispatchWorker); store.close(); });
   return { server, service, store, config, dispatcher, members, residents };
 }

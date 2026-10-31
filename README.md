@@ -4,14 +4,14 @@ A runnable voice-powered disaster relief coordination system, built for a Vaani 
 
 ## Run it now
 
-Requires **Node.js 22.13 or newer** (Node 24 LTS recommended). There are **no npm dependencies** to install.
+Requires **Node.js 24 LTS**. Run `npm install` first. Vercel/Supabase hosting is documented in [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ```sh
 cd /Users/bunnyy/Documents/Codex/2026-10-31/hey-x20/outputs/relay
 npm run dev
 ```
 
-Open **http://127.0.0.1:3000**. With no `.env`, Relay starts a local-only exercise workspace, seeds illustrative data, and enables the call lab. All data persists in `data/relay-demo.sqlite`. The UI clearly labels authored call scenarios as simulations; they perform real database operations but do not use Vaani or make phone calls.
+Open **http://127.0.0.1:3000**. With no `.env`, Relay starts an empty local-only exercise workspace and enables the call lab. Set `SEED_DEMO_DATA=true` explicitly to seed illustrative data. Local data persists in `data/relay-demo.sqlite`; the hosted Vercel adapter instead persists to Supabase. Authored call scenarios are simulations, not Vaani phone calls.
 
 ```sh
 npm test

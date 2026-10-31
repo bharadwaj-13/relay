@@ -1,0 +1,8 @@
+.env
+.env.*
+!.env.example
+data/
+.git/
+node_modules/
+vaani/generated/
+tests/

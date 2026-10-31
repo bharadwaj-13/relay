@@ -154,10 +154,9 @@ async function boot() {
   catch(error) { if (!$('#login-form')) $('#app').innerHTML=`<div class="boot">${empty('Workspace unavailable',error.message)}<button class="btn" data-cmd="retry">Retry connection</button></div>`; }
 }
 function connectEvents() {
-  eventSource?.close(); eventSource=new EventSource('/api/events');
-  eventSource.addEventListener('change',()=>{clearTimeout(reloadTimer);reloadTimer=setTimeout(()=>refresh().catch(()=>{}),100);});
-  eventSource.onopen=()=>{const el=$('#connection');if(el)el.innerHTML='<span class="dot"></span> Workspace connected';};
-  eventSource.onerror=()=>{const el=$('#connection');if(el)el.innerHTML='<span class="dot orange"></span> Reconnecting…';};
+  eventSource?.close();
+  const timer=setInterval(()=>{if(document.hidden)return;refresh().then(()=>{const el=$('#connection');if(el)el.innerHTML='<span class="dot"></span> Workspace connected';}).catch(()=>{const el=$('#connection');if(el)el.innerHTML='<span class="dot orange"></span> Reconnecting…';});},5000);
+  eventSource={close:()=>clearInterval(timer)};
 }
 function showLogin() {
   eventSource?.close(); if(dialog.open)dialog.close();

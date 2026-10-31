@@ -1,4 +1,10 @@
 .env
+.env.*
+!.env.example
+node_modules/
+.vercel/
 data/
 vaani/generated/
 .DS_Store
+.vercel
+.env*
