@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import {Store} from '../lib/store.mjs';
 import {sendSms} from '../lib/messaging.mjs';
 import {stateDatabase} from '../lib/postgres-state.mjs';
+import {ReliefService} from '../lib/domain.mjs';
+import {ResidentService} from '../lib/residents.mjs';
 
 test('deployment snapshots preserve records, metadata and retry receipts without sharing a local database',()=>{
   const a=new Store(),b=new Store();
@@ -19,6 +21,23 @@ test('serverless SMS queues before contacting any external provider',async()=>{
   let queued=false;
   const result=await sendSms({TWILIO_ACCOUNT_SID:'configured',TWILIO_AUTH_TOKEN:'configured',TWILIO_FROM_NUMBER:'configured',enqueueSms:(phone,message)=>{queued=true;assert.equal(phone,'+15555550100');assert.equal(message,'synthetic');return {status:'queued',queueId:'test'};}},'+15555550100','synthetic');
   assert.equal(result.status,'queued');assert.ok(queued);
+});
+test('minimal intake preserves unknown group size and returns a canonical location link without fake SMS success',async()=>{
+  const store=new Store();
+  try {
+    store.meta('workspace_mode','demo');
+    const service=new ReliefService(store),resident=new ResidentService(service,{PUBLIC_BASE_URL:'https://relay.tinkeringspaces.com'});
+    const input={action_id:'synthetic-short-intake',phone:'+15555550100',name:'Synthetic Resident',category:'water',quantity:4,unit:'litres',confirmed:true,consent:true};
+    const first=await resident.requestHelp(input),second=await resident.requestHelp(input);
+    assert.equal(first.request_id,second.request_id);
+    assert.equal(store.list('requests').length,1);
+    assert.equal(store.list('requests')[0].people,null);
+    assert.equal(store.list('requests')[0].locationPending,true);
+    assert.equal(first.locationLinkStatus,'demo_link');
+    assert.ok(first.exerciseUrl.startsWith('https://relay.tinkeringspaces.com/location.html#'));
+    assert.ok(!first.say.includes(first.request_id));
+    assert.match(first.say,/not sent a real text/);
+  } finally {store.close();}
 });
 test('Supabase transaction rolls back partial mutations and serializes independent writers',{skip:!process.env.RUN_DATABASE_TESTS},async()=>{
   const db=stateDatabase();

@@ -5,10 +5,5 @@
   "outputDirectory": "public",
   "regions": ["dub1"],
   "functions": { "api/index.mjs": { "maxDuration": 60, "includeFiles": "{public/**,vaani/agent-prompt.md,certs/**}" } },
-  "rewrites": [
-    {"source":"/api/:path*","destination":"/api/index"},
-    {"source":"/coordinator/:path*","destination":"/index.html"},
-    {"source":"/volunteer/:path*","destination":"/join.html"},
-    {"source":"/","destination":"/index.html"}
-  ]
+  "rewrites": [{"source":"/:path*","destination":"/api/index"}]
 }

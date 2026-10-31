@@ -29,3 +29,15 @@ The authored call lab is a labeled exercise. It is not a test of unseen live voi
 - An isolated in-memory localhost:3001 fixture verified a complete automatically assigned route, private task review, acceptance and correct Google Maps links for both legs. It did not touch the main exercise database, send messages, request device location, or open external Maps.
 - Screenshots: `../relay-nearest-route.png` and `../relay-coordinator-signin.png`.
 
+# Hosted backend verification — 31 October 2026
+
+- Vercel production deployment: `dpl_DmnJEaLWETmCsoHv65jZiL2BeKDr`.
+- Canonical HTTPS health: `https://relay.tinkeringspaces.com/api/health` → 200, exercise mode.
+- Authenticated voice gateway → 200; unauthenticated workspace → 401.
+- Hosted coordinator login/session/state/logout → 200; workspace starts with zero requests.
+- Supabase migration succeeded with CA-verified TLS. Concurrent writers serialize and thrown transactions roll back (integration test passed).
+- Cloudflare Relay CNAME added DNS-only; Vercel domain verification passed.
+- Vaani Relay Operations endpoint updated to the canonical hosted voice gateway and saved successfully.
+- No paid call placed during deployment verification. Twilio credentials absent; no real SMS claimed or sent.
+- Timer limitation: serverless dispatch/expiry runs on API activity; unattended scheduling is not configured.
+
