@@ -39,6 +39,15 @@ test('minimal intake preserves unknown group size and returns a canonical locati
     assert.match(first.say,/not sent a real text/);
   } finally {store.close();}
 });
+test('fictional video landmarks resolve only in exercise mode and only on exact names',()=>{
+ const store=new Store();try{
+  const service=new ReliefService(store);store.meta('workspace_mode','demo');store.meta('exercise_landmarks',JSON.stringify([{name:'Relay Demo School',lat:12.975,lng:77.618}]));
+  const input={name:'Synthetic Resident',phone:'',location:'Relay Demo School',category:'water',quantity:4,unit:'litres',people:1,priority:'normal'};
+  assert.equal(service.run('create_request',input).request.lat,12.975);
+  assert.equal(service.run('create_request',{...input,location:'Another school'}).request.lat,null);
+  store.meta('workspace_mode','live');assert.equal(service.run('create_request',input).request.lat,null);
+ }finally{store.close();}
+});
 test('Supabase transaction rolls back partial mutations and serializes independent writers',{skip:!process.env.RUN_DATABASE_TESTS},async()=>{
   const db=stateDatabase();
   try {
