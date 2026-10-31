@@ -72,3 +72,22 @@ test('agent cannot accept its own offer or mutate its reserved amount',t=>{
   assert.throws(()=>f.service.run('transition_assignment',{assignment_id:a.id,status:'approved'}),/volunteer must accept/);
   assert.throws(()=>f.service.run('update_request',{request_id:r.id,quantity:12}),/Cancel the active/);
 });
+test('private exercise routing targets one volunteer, queues while busy and retains safety checks',t=>{
+ const f=setup(t,500),target=f.volunteers[1];
+ f.store.meta('exercise_dispatch_volunteer_id',target.id);
+ const first=f.create({location:'First demo drop'});
+ f.create({location:'Second demo drop'});
+ f.create({location:'Urgent demo drop',priority:'urgent'});
+ const offers=f.store.list('assignments');
+ assert.equal(offers.length,1);assert.equal(offers[0].volunteerId,target.id);assert.equal(offers[0].requestId,first.id);
+ assert.equal(f.store.list('requests').find(r=>r.location==='Second demo drop').status,'new');
+ f.dispatcher.releaseOffer(offers[0],'Exercise test cancellation');f.dispatcher.reconcile();
+ const next=f.store.list('assignments').filter(a=>a.status==='offered');
+ assert.equal(next.length,1);assert.equal(next[0].volunteerId,target.id);
+ assert.equal(f.store.get('requests',next[0].requestId).location,'Second demo drop');
+ assert.equal(f.store.list('requests').find(r=>r.location==='Urgent demo drop').status,'needs_review');
+});
+test('exercise routing configuration cannot affect a live workspace',t=>{
+ const f=setup(t);f.store.meta('workspace_mode','live');f.store.meta('exercise_dispatch_volunteer_id','missing-demo-volunteer');
+ f.create();assert.equal(f.store.list('assignments').length,1);
+});
