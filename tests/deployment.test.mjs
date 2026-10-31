@@ -39,6 +39,18 @@ test('minimal intake preserves unknown group size and returns a canonical locati
     assert.match(first.say,/not sent a real text/);
   } finally {store.close();}
 });
+test('spoken final location is saved without SMS or fabricated GPS and retries stay idempotent',async()=>{
+ const store=new Store();try{
+  store.meta('workspace_mode','demo');const resident=new ResidentService(new ReliefService(store),{});
+  const input={action_id:'spoken-intake',phone:'+15555550199',name:'Exercise Resident',category:'water',quantity:4,unit:'litres',confirmed:true,consent:true,location_method:'spoken',location:'Blue gate beside the community hall'};
+  const a=await resident.requestHelp(input),b=await resident.requestHelp(input);
+  assert.equal(a.request_id,b.request_id);assert.equal(a.locationSaved,true);assert.equal(a.coordinatesKnown,false);
+  assert.equal(store.list('requests').length,1);assert.equal(store.list('locationLinks').length,0);
+  assert.equal(store.list('requests')[0].locationPending,false);assert.equal(store.list('requests')[0].locationSource,'caller_spoken_landmark');
+  assert.equal(store.list('requests')[0].lat,null);
+  await assert.rejects(resident.requestHelp({...input,location:''}),/address or landmark/);
+ }finally{store.close();}
+});
 test('fictional video landmarks resolve only in exercise mode and only on exact names',()=>{
  const store=new Store();try{
   const service=new ReliefService(store);store.meta('workspace_mode','demo');store.meta('exercise_landmarks',JSON.stringify([{name:'Relay Demo School',lat:12.975,lng:77.618}]));
