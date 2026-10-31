@@ -31,7 +31,9 @@ The authored call lab is a labeled exercise. It is not a test of unseen live voi
 
 # Hosted backend verification — 31 October 2026
 
-- Vercel production deployment: `dpl_DmnJEaLWETmCsoHv65jZiL2BeKDr`.
+- Final browser-verified Vercel deployment: `dpl_HE8sTFbjXoUSYHjLvvBXDKGGkF7M` (commit `4db4e3c`).
+- Full suite with Supabase integration enabled: 54 passed, 0 failed, 0 skipped.
+- Hosted coordinator browser login verified; overview renders an empty workspace. Trailing-slash portal URLs redirect to their canonical paths.
 - Canonical HTTPS health: `https://relay.tinkeringspaces.com/api/health` → 200, exercise mode.
 - Authenticated voice gateway → 200; unauthenticated workspace → 401.
 - Hosted coordinator login/session/state/logout → 200; workspace starts with zero requests.
