@@ -1,0 +1,4 @@
+.env
+data/
+vaani/generated/
+.DS_Store

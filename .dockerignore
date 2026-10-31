@@ -1,0 +1,5 @@
+.env
+data
+vaani/generated
+.git
+node_modules

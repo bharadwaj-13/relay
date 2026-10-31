@@ -1,0 +1,35 @@
+const esc = value => String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function capacitySummary(v,state) {
+  const d=v.dispatch;if(d.capacities)return Object.entries(d.capacities).filter(([,c])=>c.maxQuantity>0).map(([category,c])=>`${c.maxQuantity} ${esc(c.unit)} ${esc(category)}`).join(' · ');
+  const stock=state.resources.find(r=>r.id===d.resourceId);return `${d.maxQuantity} ${esc(stock?.unit||'units')} ${esc(stock?.category||'')}`;
+}
+
+export function dispatchView(state) {
+  const p=state.dispatchPolicy||{enabled:false,acceptConfirmedReports:false,radiusKm:8,offerSeconds:300};
+  const offers=state.assignments.filter(a=>a.automatic), notifications=state.notifications||[];
+  return `<div class="page-heading"><div><p class="eyebrow">From a call to a helping hand</p><h1>Automatic dispatch</h1><p class="subtitle">Match confirmed needs with opted-in volunteers. Let people accept the job.</p></div><span class="pill ${p.enabled?'available':'paused'}">${p.enabled?'Automatic dispatch on':'Dispatch paused'}</span></div>
+  <div class="voice-hero"><div><h2>The next step can happen on its own.</h2><p>Food and water requests → available verified supplies → an eligible volunteer → an offer on their phone. The dashboard follows every step.</p></div><button class="btn mint" data-dispatch-cmd="run">Check pending requests</button></div>
+  <div class="integration-grid"><section class="panel integration-card"><h2>Dispatch policy</h2><form data-dispatch-form="policy"><div class="fields"><label class="check-field field full"><input type="checkbox" name="enabled" ${p.enabled?'checked':''}><span>Enable automatic food and water offers</span></label><label class="check-field field full"><input type="checkbox" name="acceptConfirmedReports" ${p.acceptConfirmedReports?'checked':''}><span>Also accept caller-confirmed reports without per-request coordinator approval. Duplicates, urgent reports, missing coordinates, and medical requests still stay out.</span></label><div class="field"><label for="dispatch-radius">Maximum trip proximity (km)</label><input id="dispatch-radius" name="radiusKm" type="number" min=".1" max="50" step=".1" value="${p.radiusKm}" required></div><div class="field"><label for="dispatch-timeout">Offer timeout (seconds)</label><input id="dispatch-timeout" name="offerSeconds" type="number" min="30" max="3600" value="${p.offerSeconds}" required></div></div><div class="detail-actions"><button class="btn primary" type="submit">Save dispatch policy</button></div></form><div class="note">Distances are straight-line pickup + delivery estimates, not safe-road recommendations. Stock and carrying limits are checked before each offer.</div></section>
+  <section class="panel integration-card"><h2>Nearest feasible trip, automatically.</h2><p>Volunteers join independently and set category-specific carrying limits. They never choose a depot or browse resident requests.</p><ol class="settings-steps"><li><span><strong>Check the need.</strong><br>Only eligible food/water requests with confirmed locations enter matching.</span></li><li><span><strong>Compare every feasible pickup.</strong><br>Use verified stock with matching units and enough inventory, not a universal collection point.</span></li><li><span><strong>Choose a nearby complete trip.</strong><br>Rank volunteer → pickup → resident distances together, respecting capacity and radius.</span></li><li><span><strong>Reserve and offer.</strong><br>One task per volunteer; acceptance is required. Declined or expired offers are rematched.</span></li></ol><div class="note">Greedy shortest feasible trip, with oldest request as a tie-breaker. Straight-line estimates—not a globally optimal route, ETA, or safe-road claim.</div></section></div>
+  <div class="section-heading"><h2>Enrolled volunteers</h2></div><section class="panel">${state.volunteers.filter(v=>v.dispatch).map(v=>`<div class="volunteer-card"><span class="avatar">${esc(v.name.slice(0,1))}</span><div><h3>${esc(v.name)}</h3><p>${capacitySummary(v,state)} · ${v.dispatch.maxDistanceKm} km · ${esc(v.dispatch.channel)} · ${esc(v.status)}</p></div><button class="btn small" style="margin-left:auto" data-dispatch-cmd="unenroll" data-id="${esc(v.id)}">Remove enrollment</button></div>`).join('')||'<div class="empty">Enroll a consenting volunteer to begin.</div>'}</section>
+  <div class="section-heading"><h2>Automatic assignments</h2><span class="subtitle">Pickup and drop-off chosen together</span></div><section class="panel"><div class="table-scroll"><table class="data-table"><thead><tr><th>Request</th><th>Volunteer</th><th>Assigned pickup → drop-off</th><th>Trip proximity</th><th>Status / notification</th></tr></thead><tbody>${offers.map(a=>{const n=notifications.find(n=>n.assignmentId===a.id),v=state.volunteers.find(v=>v.id===a.volunteerId),r=state.requests.find(r=>r.id===a.requestId),s=state.resources.find(s=>s.id===a.resourceId);return `<tr><td><strong>${esc(a.requestId)}</strong><small>${esc(a.id)}</small></td><td>${esc(v?.name||a.volunteerId)}</td><td><strong>${esc(s?.location||a.resourceId)}</strong><small>↓ ${esc(r?.location||a.requestId)}</small></td><td>${Number.isFinite(a.distanceKm)?a.distanceKm.toFixed(1)+' km':'Unknown'}</td><td><span class="pill ${esc(a.status)}">${esc(a.status.replaceAll('_',' '))}</span><small>${esc(n?.status||'not queued')}</small></td></tr>`;}).join('')||'<tr><td colspan="5">No automatic assignments yet. Enable dispatch and wait for eligible requests and available opted-in volunteers.</td></tr>'}</tbody></table></div></section><div class="note">Volunteers review assignments in their own portal; this workspace does not open or impersonate their task session. “Submitted” means SMS provider acceptance, not handset delivery. Receipt confirmation remains separate.</div>`;
+}
+export function bindDispatch({api,refresh,toast}) {
+  document.addEventListener('submit',async e=>{
+    const form=e.target;if(!form.matches('[data-dispatch-form]'))return;e.preventDefault();
+    const submit=form.querySelector('button[type="submit"]');submit.disabled=true;
+    try{
+      const f=Object.fromEntries(new FormData(form));
+      if(form.dataset.dispatchForm==='policy')await api('dispatch/policy',{enabled:!!f.enabled,acceptConfirmedReports:!!f.acceptConfirmedReports,radiusKm:Number(f.radiusKm),offerSeconds:Number(f.offerSeconds)});
+      await refresh();toast('Dispatch settings saved. Eligible requests checked automatically.');
+    }catch(error){toast(error.message,true);}finally{submit.disabled=false;}
+  });
+  document.addEventListener('click',async e=>{
+    const button=e.target.closest('[data-dispatch-cmd]');if(!button)return;
+    try{
+      if(button.dataset.dispatchCmd==='run'){await api('dispatch/run',{});await refresh();toast('Pending requests checked.');}
+      if(button.dataset.dispatchCmd==='unenroll'){await api('dispatch/enroll',{volunteer_id:button.dataset.id,enabled:false});await refresh();}
+    }catch(error){toast(error.message,true);}
+  });
+}

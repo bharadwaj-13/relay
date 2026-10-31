@@ -1,0 +1,14 @@
+{
+  "name": "relay-relief-operations",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22.13.0" },
+  "scripts": {
+    "dev": "node --env-file-if-exists=.env server.mjs",
+    "start": "node --env-file-if-exists=.env server.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "vaani:setup": "node --env-file-if-exists=.env scripts/setup-vaani.mjs",
+    "vaani:tools": "node --env-file-if-exists=.env scripts/export-tools.mjs"
+  }
+}
