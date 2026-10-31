@@ -1,7 +1,8 @@
 import { captureGps } from './gps.js';
+import {workspaceHeaders} from './workspace-context.js';
 const token=location.hash.slice(1),root=document.querySelector('#location-card');let geo=null,info;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-async function api(path,data){const r=await fetch(`/api/location/${path}`,{method:data?'POST':'GET',headers:{Authorization:`Bearer ${token}`,...(data?{'Content-Type':'application/json'}:{})},...(data?{body:JSON.stringify(data)}:{})});const v=await r.json();if(!r.ok)throw new Error(v.error);return v;}
+async function api(path,data){const r=await fetch(`/api/location/${path}`,{method:data?'POST':'GET',headers:{...workspaceHeaders(),Authorization:`Bearer ${token}`,...(data?{'Content-Type':'application/json'}:{})},...(data?{body:JSON.stringify(data)}:{})});const v=await r.json();if(!r.ok)throw new Error(v.error);return v;}
 function saved(message='Your delivery location is saved. You can return to your phone call or call Relay again to track your request.'){root.innerHTML=`<div class="dialog-body"><p class="eyebrow">Relay / delivery location</p><h1>We have your landmark.</h1><p>${esc(message)}</p><div class="note">This confirms your location, not a delivery time or a dispatch guarantee.</div></div>`;}
 async function boot(){
   info=await api('info');if(info.saved){saved();return;}

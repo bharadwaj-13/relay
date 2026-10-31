@@ -3,6 +3,7 @@ import {randomUUID} from 'node:crypto';
 import {createApp} from '../server.mjs';
 import {stateDatabase} from '../lib/postgres-state.mjs';
 import {sendSms} from '../lib/messaging.mjs';
+import {Store} from '../lib/store.mjs';
 
 export const config={api:{bodyParser:false}};
 let database;
@@ -40,21 +41,28 @@ export default async function handler(req,res) {
   try {
     database ||= stateDatabase();
     const response=await database.transaction(async store=>{
-      const env={...process.env,SERVERLESS:'true',SEED_DEMO_DATA:'false'};
+      const env={...process.env,SERVERLESS:'true',SEED_DEMO_DATA:'false',REQUEST_SCOPED:'true',WORKSPACE_SLUG:String(req.headers['x-relay-workspace']||new URL(req.url,'http://relay.local').searchParams.get('org')||'')};
+      let currentStore=store;
       env.enqueueSms=(phone,message)=>{
-        const id=randomUUID();store.put('smsOutbox',{id,phone,message,status:'pending',createdAt:Date.now()});
+        const id=randomUUID();currentStore.put('smsOutbox',{id,phone,message,status:'pending',createdAt:Date.now()});
         return {status:'queued',queueId:id};
       };
       const app=createApp(env,store),buffer=new BufferedResponse();
+      currentStore=app.store;
       try {
         app.dispatcher.tick();
         await app.server.listeners('request')[0](req,buffer);
         await app.dispatcher.flushNotifications();
+        app.persist();
         return buffer;
-      } finally {app.server.removeAllListeners();}
+      } finally {if(app.store!==store)app.store.close();app.server.removeAllListeners();}
     });
     // The request is committed before a provider can observe any queued SMS.
-    await drainSms(database,process.env).catch(()=>{});
+    const slug=String(req.headers['x-relay-workspace']||new URL(req.url,'http://relay.local').searchParams.get('org')||'');
+    const smsDb=process.env.ORGANIZATION_MODE==='true'?{transaction:fn=>database.transaction(async registry=>{
+      const org=registry.list('organizations').find(o=>o.slug===slug);if(!org)return null;const scoped=new Store();try{scoped.restore(org.snapshot);const result=await fn(scoped);registry.put('organizations',{...org,snapshot:scoped.dump()});return result;}finally{scoped.close();}
+    })}:database;
+    await drainSms(smsDb,process.env).catch(()=>{});
     res.writeHead(response.statusCode,response.headers);
     res.end(Buffer.concat(response.parts));
   } catch {res.writeHead(503,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end('{"error":"Database temporarily unavailable. No action is confirmed; retry with the same action ID."}');}

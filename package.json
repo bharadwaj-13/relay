@@ -7,8 +7,8 @@
     "node": "24.x"
   },
   "scripts": {
-    "dev": "node --env-file-if-exists=.env server.mjs",
-    "start": "node --env-file-if-exists=.env server.mjs",
+    "dev": "node --env-file-if-exists=.env scripts/dev.mjs",
+    "start": "node --env-file-if-exists=.env scripts/dev.mjs",
     "test": "node --test tests/*.test.mjs",
     "vaani:setup": "node --env-file-if-exists=.env scripts/setup-vaani.mjs",
     "vaani:tools": "node --env-file-if-exists=.env scripts/export-tools.mjs"

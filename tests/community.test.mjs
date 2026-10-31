@@ -42,6 +42,16 @@ test('unverified accounts cannot sign in and incorrect codes are rate-limited',a
   for(let i=0;i<5;i++)assert.throws(()=>f.members.verify({accountId:signup.accountId,code:'wrong'}),/Incorrect/);
   assert.throws(()=>f.members.verify({accountId:signup.accountId,code:signup.developmentCode}),/expired/);
 });
+test('supplier stock updates stay private, require re-review and cannot change reserved stock',async t=>{
+ const f=fixture(t),supplier=await f.join('supplier'),other=await f.join('supplier','+15555550999');
+ const {resource}=f.members.addSupply(supplier.token,{name:'Water',category:'water',quantity:20,unit:'litres',location:'Pickup',lat:12.98,lng:77.62,accuracy:10,locationConsent:true});
+ f.service.run('verify_resource',{resource_id:resource.id});
+ assert.throws(()=>f.members.updateSupply(other.token,{resource_id:resource.id,quantity:99}),/not found/);
+ f.members.updateSupply(supplier.token,{resource_id:resource.id,quantity:10});assert.equal(f.store.get('resources',resource.id).verification,'reported');
+ assert.throws(()=>f.members.updateSupply(supplier.token,{resource_id:resource.id,quantity:-1}),/quantity/);
+ f.store.put('assignments',{id:'reserved',resourceId:resource.id,status:'approved'});
+ assert.throws(()=>f.members.updateSupply(supplier.token,{resource_id:resource.id,quantity:0}),/reserved/);
+});
 test('live signup does not expose a development verification code when SMS is absent',async t=>{
   const f=fixture(t,'live');const signup=await f.members.signup({name:'Test',phone:'+971500000013',password:'test-password-long',role:'supplier',consent:true});
   assert.equal(signup.developmentCode,undefined);assert.equal(signup.verification,'configuration_required');
