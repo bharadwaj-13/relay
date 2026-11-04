@@ -1,5 +1,9 @@
 # Relay: organisation workspaces
 
+## Portfolio sandbox — isolated from this platform
+
+`/sandbox` is a public, browser-only simulation. Its sample state is not an organisation in Supabase and does not use the private exercise archive. It runs a separate illustrative matching model, not the server domain engine. Role switching is for demonstration only and never changes real account permissions. Scripted call replay is not a live Vaani call. It makes no API calls and needs no provider credentials, payments, microphone or GPS. Server handling bypasses database initialization and the page blocks connections through CSP. Reset affects only the demo's tab-scoped session storage key. Deep links support `?role=resident`, `?role=volunteer`, `?role=supplier`, or `?role=coordinator`.
+
 ## Getting started
 
 Open https://relay.tinkeringspaces.com/workspace, create a personal account, then create an organisation. Its creator is owner of only that workspace. A name is not a government/NGO identity certification. Accounts using password sign-in have unverified emails; do not treat that as proof of organisational authority.

@@ -13,6 +13,7 @@ import { AutoDispatch } from './lib/automation.mjs';
 import { MemberService } from './lib/members.mjs';
 import { ResidentService } from './lib/residents.mjs';
 import { PlatformService } from './lib/platform.mjs';
+import {serveSandbox} from './lib/sandbox-static.mjs';
 
 const root = fileURLToPath(new URL('.', import.meta.url));
 export function createApp(env = process.env, suppliedStore = null) {
@@ -48,6 +49,7 @@ export function createApp(env = process.env, suppliedStore = null) {
     return false;
   };
   const server = createServer(async (req, res) => {
+    if(await serveSandbox(req,res))return;
     if(organizationMode&&env.REQUEST_SCOPED!=='true'){
       const scoped=createApp({...env,REQUEST_SCOPED:'true',SERVERLESS:'true',WORKSPACE_SLUG:String(req.headers['x-relay-workspace']||new URL(req.url,'http://relay.local').searchParams.get('org')||'')},registry);
       try{await scoped.server.listeners('request')[0](req,res);scoped.persist();}finally{scoped.store.close();scoped.server.removeAllListeners();}return;

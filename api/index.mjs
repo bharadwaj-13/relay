@@ -4,6 +4,7 @@ import {createApp} from '../server.mjs';
 import {stateDatabase} from '../lib/postgres-state.mjs';
 import {sendSms} from '../lib/messaging.mjs';
 import {Store} from '../lib/store.mjs';
+import {serveSandbox} from '../lib/sandbox-static.mjs';
 
 export const config={api:{bodyParser:false}};
 let database;
@@ -35,6 +36,8 @@ export async function drainSms(db,env) {
 }
 
 export default async function handler(req,res) {
+  // Serve the portfolio demo before opening any database connection.
+  if(await serveSandbox(req,res))return;
   const path=new URL(req.url,'http://relay.local').pathname;
   // SSE is intentionally replaced by short polling across serverless instances.
   if(['/api/events','/api/members/events'].includes(path)){res.writeHead(410,{'Content-Type':'application/json'});res.end('{"polling":true}');return;}

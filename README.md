@@ -1,5 +1,15 @@
 # Relay
 
+## Portfolio sandbox
+
+**[Try the interactive demo →](https://relay.tinkeringspaces.com/sandbox)**
+
+No account or provider setup is needed. Replay a **scripted** request, switch between coordinator/resident/volunteer/supplier views, accept an example task, report pickup/handover, confirm resident receipt, and update fictional inventory. Medical requests stay in human review. Reset only your tab's demo state at any time.
+
+This is a browser-only simulation with its own illustrative matching model, not a real Vaani call or a production backend integration test. It never imports live accounts or records, calls production APIs, sends SMS, requests microphone/GPS access, or spends credits. The sandbox page is served before the database adapter and blocks network connections with CSP. Data is stored only under `relay_portfolio_sandbox_v1` in this tab's session storage; browsers with storage disabled can still use it until reloading.
+
+For the **current organisation-based live platform**, see [PRODUCTION.md](PRODUCTION.md). The older hackathon/local-exercise setup notes below are historical and do not describe the live account model.
+
 A runnable voice-powered disaster relief coordination system, built for a Vaani voice-agent hackathon. Vaani hosts the agent; Relay supplies authenticated action endpoints, durable records, and the coordinator workspace.
 
 ## Run it now
