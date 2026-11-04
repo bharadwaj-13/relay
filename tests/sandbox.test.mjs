@@ -32,21 +32,21 @@ test('sandbox supplier edits require verification and cannot change active reser
  const added=addStock(freshSandbox(),{name:'Demo meals',category:'food',quantity:12});assert.equal(added.resources[0].verification,'reported');assert.equal(added.resources[0].unit,'meals');
 });
 test('sandbox sessions restore valid demo state and reset malformed or oversized content',()=>{
- const s=submitRequest(freshSandbox(),input);assert.deepEqual(parseSandbox(JSON.stringify(s)),s);assert.deepEqual(parseSandbox('bad json'),freshSandbox());assert.deepEqual(parseSandbox(JSON.stringify({version:1})),freshSandbox());assert.deepEqual(parseSandbox('x'.repeat(100001)),freshSandbox());
+ const s=submitRequest(freshSandbox(),input);assert.deepEqual(parseSandbox(JSON.stringify(s)),s);assert.deepEqual(parseSandbox('bad json'),freshSandbox());assert.deepEqual(parseSandbox(JSON.stringify({version:1})),freshSandbox());assert.deepEqual(parseSandbox('x'.repeat(250001)),freshSandbox());
  assert.throws(()=>submitRequest(freshSandbox(),{...input,confirmed:false}),/Confirm/);assert.throws(()=>submitRequest(freshSandbox(),{...input,quantity:-5}),/quantity/);
 });
 function response(){return {status:0,headers:{},body:'',writeHead(status,headers){this.status=status;this.headers=headers;},end(body){this.body=body?.toString()||'';}};}
 test('production sandbox routes work without DATABASE_URL and reject server mutations',async()=>{
  const old=process.env.DATABASE_URL;delete process.env.DATABASE_URL;
  try{
-  for(const path of ['/sandbox','/sandbox?org=real-private-workspace','/sandbox.html','/sandbox.js','/sandbox-model.js','/sandbox.css','/favicon.svg']){const res=response();await handler({url:path,method:'GET'},res);assert.equal(res.status,200,path);assert.match(res.headers['Content-Security-Policy'],/connect-src 'none'/);assert.ok(res.body.length);assert.equal(res.headers['Set-Cookie'],undefined);}
+  for(const path of ['/sandbox','/sandbox?org=real-private-workspace','/sandbox.html','/sandbox.js','/sandbox-model.js','/sandbox-voice.js','/sandbox-intake.js','/sandbox.css','/favicon.svg']){const res=response();await handler({url:path,method:'GET'},res);assert.equal(res.status,200,path);assert.match(res.headers['Content-Security-Policy'],/connect-src 'none'/);assert.match(res.headers['Content-Security-Policy'],/media-src blob:/);assert.ok(res.body.length);assert.equal(res.headers['Set-Cookie'],undefined);}
   const post=response();await handler({url:'/sandbox',method:'POST'},post);assert.equal(post.status,405);
   const head=response();await handler({url:'/sandbox',method:'HEAD'},head);assert.equal(head.status,200);assert.equal(head.body,'');
   assert.equal(await serveSandbox({url:'/.env',method:'GET'},response()),false);
  }finally{if(old!==undefined)process.env.DATABASE_URL=old;}
 });
 test('sandbox frontend has no production client imports, API calls or provider connections',async()=>{
- for(const file of ['sandbox.js','sandbox-model.js']){const source=await readFile(new URL(`../public/${file}`,import.meta.url),'utf8');assert.doesNotMatch(source,/\b(fetch|XMLHttpRequest|WebSocket|EventSource)\s*\(/);assert.doesNotMatch(source,/from ['"].*(?:platform|members|community|app|postgres-state|vaani)\./);}
- const source=await readFile(new URL('../public/sandbox.js',import.meta.url),'utf8');assert.match(source,/relay_portfolio_sandbox_v1/);assert.doesNotMatch(source,/(localStorage|navigator\.geolocation|navigator\.mediaDevices|sessionStorage\.clear)/);
- const html=await readFile(new URL('../public/sandbox.html',import.meta.url),'utf8');assert.match(html,/connect-src 'none'/);assert.match(html,/Fictional data/);assert.match(html,/no real calls/);
+ for(const file of ['sandbox.js','sandbox-model.js','sandbox-voice.js','sandbox-intake.js']){const source=await readFile(new URL(`../public/${file}`,import.meta.url),'utf8');assert.doesNotMatch(source,/\b(fetch|XMLHttpRequest|WebSocket|EventSource)\s*\(/);assert.doesNotMatch(source,/from ['"].*(?:platform|members|community|app|postgres-state|vaani)\./);}
+ const source=await readFile(new URL('../public/sandbox.js',import.meta.url),'utf8');assert.match(source,/relay_voice_sandbox_v2/);assert.match(source,/addEventListener\('storage'/);assert.doesNotMatch(source,/(localStorage\.clear|sessionStorage\.clear)/);
+ const html=await readFile(new URL('../public/sandbox.html',import.meta.url),'utf8');assert.match(html,/connect-src 'none'/);assert.match(html,/Real recording/);assert.match(html,/no real calls/);
 });
